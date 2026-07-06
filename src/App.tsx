@@ -41,12 +41,19 @@ type MetricProps = {
   label: string
   value: string
   detail: string
+  progress?: number
+  tone?: 'gold' | 'green' | 'red'
 }
 
 type PanelTitleProps = {
   icon: ReactNode
   kicker: string
   title: string
+}
+
+type CountdownPart = {
+  label: string
+  value: number
 }
 
 const DAY_MS = 86_400_000
@@ -89,14 +96,15 @@ function readNumber(key: string, fallback: number) {
 }
 
 function readWallet() {
+  const fallback = { address: '', network: '未连接', demo: false }
   const raw = localStorage.getItem(STORAGE_KEYS.wallet)
-  if (!raw) return { address: '', network: '未连接', demo: false }
+  if (!raw) return fallback
 
   try {
     const parsed = JSON.parse(raw) as WalletState
-    return parsed.address ? parsed : { address: '', network: '未连接', demo: false }
+    return parsed.address ? parsed : fallback
   } catch {
-    return { address: '', network: '未连接', demo: false }
+    return fallback
   }
 }
 
@@ -124,6 +132,7 @@ function formatWhole(value: number) {
 
 function shortAddress(address: string) {
   if (!address) return '连接钱包'
+  if (address.length <= 12) return address
   return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
@@ -136,15 +145,20 @@ function getCountdown(launchAt: number, now: number) {
   return { total, days, hours, minutes, seconds }
 }
 
-function Metric({ icon, label, value, detail }: MetricProps) {
+function Metric({ icon, label, value, detail, progress, tone = 'gold' }: MetricProps) {
   return (
-    <article className="metric">
-      <div className="metric-icon">{icon}</div>
-      <div>
+    <article className={`metric metric-${tone}`}>
+      <div className="metric-head">
+        <div className="metric-icon">{icon}</div>
         <span>{label}</span>
-        <strong>{value}</strong>
-        <small>{detail}</small>
       </div>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+      {typeof progress === 'number' ? (
+        <div className="metric-progress" aria-hidden="true">
+          <span style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }} />
+        </div>
+      ) : null}
     </article>
   )
 }
@@ -157,6 +171,15 @@ function PanelTitle({ icon, kicker, title }: PanelTitleProps) {
         <span>{kicker}</span>
         <h2>{title}</h2>
       </div>
+    </div>
+  )
+}
+
+function CountdownBox({ label, value }: CountdownPart) {
+  return (
+    <div className="countdown-box">
+      <strong>{String(value).padStart(2, '0')}</strong>
+      <span>{label}</span>
     </div>
   )
 }
@@ -182,7 +205,12 @@ export default function App() {
   const dailyOutput = personalPower * TOKENOMICS.dailyRate
   const monthlyOutput = personalPower * TOKENOMICS.monthlyRate
   const remainingSupply = Math.max(TOKENOMICS.totalSupply - globalMined, 0)
+  const supplyProgress = (globalMined / TOKENOMICS.totalSupply) * 100
   const liquidityProgress = Math.min((globalMined / TOKENOMICS.liquidityThreshold) * 100, 100)
+  const headMineProgress = miningStarted
+    ? 100
+    : 100 - (countdown.total / (TOKENOMICS.headMineDelayDays * DAY_MS)) * 100
+  const minerGateProgress = Math.min((machineCount / TOKENOMICS.withdrawMachineGate) * 100, 100)
   const unlockedGenerationCount = Math.min(directCount, TOKENOMICS.referralRates.length)
   const referralBonusRate = TOKENOMICS.referralRates
     .slice(0, unlockedGenerationCount)
@@ -192,9 +220,17 @@ export default function App() {
   const validWithdrawValue = Number.isFinite(withdrawValue) ? Math.max(withdrawValue, 0) : 0
   const withdrawFee = validWithdrawValue * (feeRate / 100)
   const withdrawNet = Math.max(validWithdrawValue - withdrawFee, 0)
+  const withdrawReady = machineCount >= TOKENOMICS.withdrawMachineGate
+  const nextStep = boundReferrer ? (withdrawReady ? '提币条件已满足' : '再增加 1 台矿机') : '先绑定推荐人'
   const referralLink = wallet.address
     ? `${window.location.origin}${window.location.pathname}?ref=${wallet.address}`
     : '连接钱包后生成'
+  const countdownParts = [
+    { label: '天', value: countdown.days },
+    { label: '时', value: countdown.hours },
+    { label: '分', value: countdown.minutes },
+    { label: '秒', value: countdown.seconds },
+  ]
 
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref')
@@ -311,7 +347,7 @@ export default function App() {
   }
 
   function withdraw() {
-    if (machineCount < TOKENOMICS.withdrawMachineGate) {
+    if (!withdrawReady) {
       setLatestTx('提币需要至少两台矿机')
       return
     }
@@ -360,47 +396,72 @@ export default function App() {
       <main>
         <section className="hero-panel">
           <div className="hero-copy">
-            <span className="eyebrow">VENICE · WNS</span>
-            <h1>开启全球共识新时代</h1>
+            <span className="eyebrow">VENICE · WNS PROTOCOL</span>
+            <h1>威尼斯 WNS 共识矿池</h1>
             <p>
               总量 {formatWhole(TOKENOMICS.totalSupply)} 枚，挖出{' '}
-              {formatWhole(TOKENOMICS.liquidityThreshold)} 枚后启动流动性矿池。
+              {formatWhole(TOKENOMICS.liquidityThreshold)} 枚后启动流动性矿池。绑定推荐人后领取 100 WNS
+              矿机，三天后正式开启头矿。
             </p>
+
             <div className="hero-badges">
               <span>
                 <Pickaxe size={16} />
-                每日 0.5%
+                每日收益 0.5%
               </span>
               <span>
                 <Gift size={16} />
-                赠送 100 WNS 矿机
+                新人矿机 100 WNS
               </span>
               <span>
                 <Users size={16} />
-                九代收益
+                直推 9 人享九代
               </span>
             </div>
-            <div className="launch-strip">
-              <Clock3 size={20} />
-              <div>
-                <span>{miningStarted ? '头矿已开启' : '头矿倒计时'}</span>
-                <strong>
-                  {miningStarted
-                    ? '正式挖矿中'
-                    : `${countdown.days}天 ${countdown.hours}时 ${countdown.minutes}分 ${countdown.seconds}秒`}
-                </strong>
+
+            <div className="launch-card">
+              <div className="launch-card-head">
+                <div>
+                  <span>{miningStarted ? 'HEAD MINE OPEN' : 'HEAD MINE COUNTDOWN'}</span>
+                  <strong>{miningStarted ? '头矿已开启' : '头矿倒计时'}</strong>
+                </div>
+                <Clock3 size={22} />
+              </div>
+              <div className="countdown-grid">
+                {countdownParts.map((part) => (
+                  <CountdownBox key={part.label} label={part.label} value={part.value} />
+                ))}
+              </div>
+              <div className="progress-track hero-progress">
+                <span style={{ width: `${Math.min(Math.max(headMineProgress, 0), 100)}%` }} />
               </div>
             </div>
           </div>
 
-          <div className="coin-stage" aria-label="WNS Venice token">
-            <div className="coin-ring">
-              <div className="coin-face">
-                <span>WNS</span>
-                <small>VENICE</small>
+          <div className="hero-visual" aria-label="WNS Venice token">
+            <div className="coin-stage">
+              <div className="coin-ring">
+                <div className="coin-face">
+                  <span>WNS</span>
+                  <small>VENICE</small>
+                </div>
+              </div>
+              <div className="coin-base" />
+            </div>
+            <div className="hero-ledger">
+              <div>
+                <span>总发行</span>
+                <strong>{formatWhole(TOKENOMICS.totalSupply)}</strong>
+              </div>
+              <div>
+                <span>开池线</span>
+                <strong>{formatWhole(TOKENOMICS.liquidityThreshold)}</strong>
+              </div>
+              <div>
+                <span>当前阶段</span>
+                <strong>{nextStep}</strong>
               </div>
             </div>
-            <div className="coin-base" />
           </div>
         </section>
 
@@ -410,29 +471,35 @@ export default function App() {
             label="总发行"
             value={`${formatWhole(TOKENOMICS.totalSupply)} WNS`}
             detail="固定总量"
+            progress={100}
           />
           <Metric
             icon={<ChartNoAxesCombined size={24} />}
             label="今日产出"
             value={`${formatToken(dailyOutput, 4)} WNS`}
             detail={`月收益 ${formatToken(monthlyOutput)} WNS`}
+            progress={machineCount > 0 ? 100 : 0}
+            tone="green"
           />
           <Metric
             icon={<Sparkles size={24} />}
             label="已挖数量"
             value={`${formatToken(globalMined)} WNS`}
             detail={`剩余 ${formatToken(remainingSupply)} WNS`}
+            progress={supplyProgress}
           />
           <Metric
             icon={<ShieldCheck size={24} />}
             label="流动性矿池"
             value={`${formatToken(liquidityProgress)}%`}
             detail={globalMined >= TOKENOMICS.liquidityThreshold ? '已达启动线' : '等待 100 万枚'}
+            progress={liquidityProgress}
+            tone="green"
           />
         </section>
 
-        <section className="workspace-grid">
-          <article className="panel">
+        <section className="control-layout">
+          <article className="panel bind-panel">
             <PanelTitle icon={<Link2 size={22} />} kicker="STEP 01" title="绑定推荐人" />
             <div className="input-row">
               <input
@@ -467,47 +534,53 @@ export default function App() {
             </dl>
           </article>
 
-          <article className="panel">
+          <article className="panel miner-panel">
             <PanelTitle icon={<Hammer size={22} />} kicker="MINER" title="矿机收益" />
-            <div className="miner-readout">
-              <span>{machineCount}</span>
-              <div>
-                <strong>矿机数量</strong>
+            <div className="miner-core">
+              <div className="miner-token">
+                <span>{machineCount}</span>
+                <small>MINERS</small>
+              </div>
+              <div className="miner-income">
+                <span>算力本金</span>
+                <strong>{formatToken(personalPower)} WNS</strong>
                 <small>每台价值 100 WNS</small>
               </div>
             </div>
-            <div className="progress-track">
-              <span style={{ width: `${Math.min((machineCount / 2) * 100, 100)}%` }} />
+            <div className="mini-stats">
+              <div>
+                <span>每日收益</span>
+                <strong>{formatToken(dailyOutput, 4)}</strong>
+              </div>
+              <div>
+                <span>月收益</span>
+                <strong>{formatToken(monthlyOutput)}</strong>
+              </div>
+              <div>
+                <span>可提余额</span>
+                <strong>{formatToken(availableReward, 4)}</strong>
+              </div>
             </div>
-            <dl className="data-list compact">
+            <div className="gate-line">
               <div>
-                <dt>算力本金</dt>
-                <dd>{formatToken(personalPower)} WNS</dd>
+                <span>提币门槛</span>
+                <strong>{machineCount}/{TOKENOMICS.withdrawMachineGate} 台</strong>
               </div>
-              <div>
-                <dt>每日收益</dt>
-                <dd>{formatToken(dailyOutput, 4)} WNS</dd>
+              <div className="progress-track">
+                <span style={{ width: `${minerGateProgress}%` }} />
               </div>
-              <div>
-                <dt>可提余额</dt>
-                <dd>{formatToken(availableReward, 6)} WNS</dd>
-              </div>
-            </dl>
+            </div>
             <button className="wide-button" type="button" onClick={buyMiner}>
               <Pickaxe size={18} />
               增加 100 WNS 矿机
             </button>
           </article>
 
-          <article className="panel">
+          <article className="panel withdraw-panel">
             <PanelTitle icon={<ArrowDownToLine size={22} />} kicker="WITHDRAW" title="提币" />
-            <div className="gate-status">
+            <div className={withdrawReady ? 'gate-status ready' : 'gate-status'}>
               <LockKeyhole size={18} />
-              <span>
-                {machineCount >= TOKENOMICS.withdrawMachineGate
-                  ? '提币条件已满足'
-                  : `至少需要 ${TOKENOMICS.withdrawMachineGate} 台矿机`}
-              </span>
+              <span>{withdrawReady ? '提币条件已满足' : `至少需要 ${TOKENOMICS.withdrawMachineGate} 台矿机`}</span>
             </div>
             <div className="input-row single">
               <input
@@ -517,16 +590,16 @@ export default function App() {
                 inputMode="decimal"
               />
             </div>
-            <dl className="data-list compact">
+            <div className="fee-preview">
               <div>
-                <dt>手续费</dt>
-                <dd>{formatToken(withdrawFee)} WNS</dd>
+                <span>手续费</span>
+                <strong>{formatToken(withdrawFee)} WNS</strong>
               </div>
               <div>
-                <dt>预计到账</dt>
-                <dd>{formatToken(withdrawNet)} WNS</dd>
+                <span>预计到账</span>
+                <strong>{formatToken(withdrawNet)} WNS</strong>
               </div>
-            </dl>
+            </div>
             <button className="wide-button" type="button" onClick={withdraw}>
               <ArrowDownToLine size={18} />
               提币申请
@@ -551,7 +624,7 @@ export default function App() {
                 <article className={unlocked ? 'generation active' : 'generation'} key={`generation-${rate}-${index}`}>
                   <span>{index + 1}代</span>
                   <strong>{rate}%</strong>
-                  <small>{unlocked ? '已解锁' : '待直推'}</small>
+                  <small>{unlocked ? '已解锁' : `直推 ${index + 1} 人`}</small>
                 </article>
               )
             })}
@@ -563,7 +636,7 @@ export default function App() {
         </section>
 
         <section className="admin-grid">
-          <article className="panel">
+          <article className="panel admin-panel">
             <PanelTitle icon={<Settings size={22} />} kicker="ADMIN" title="运营参数" />
             <div className="setting-row">
               <div>
