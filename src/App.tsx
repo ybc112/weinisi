@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ethers } from 'ethers'
 import {
@@ -54,6 +54,14 @@ type PanelTitleProps = {
 type CountdownPart = {
   label: string
   value: number
+}
+
+type ToastType = 'info' | 'success' | 'error'
+
+type ToastItem = {
+  id: number
+  message: string
+  type: ToastType
 }
 
 const DAY_MS = 86_400_000
@@ -178,7 +186,7 @@ function PanelTitle({ icon, kicker, title }: PanelTitleProps) {
 function CountdownBox({ label, value }: CountdownPart) {
   return (
     <div className="countdown-box">
-      <strong>{String(value).padStart(2, '0')}</strong>
+      <strong className="numeric">{String(value).padStart(2, '0')}</strong>
       <span>{label}</span>
     </div>
   )
@@ -198,6 +206,23 @@ export default function App() {
   const [lastTick, setLastTick] = useState(() => readNumber(STORAGE_KEYS.lastTick, Date.now()))
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [latestTx, setLatestTx] = useState('等待连接钱包并绑定推荐人')
+  const [toasts, setToasts] = useState<ToastItem[]>([])
+
+  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+    const id = Date.now() + Math.random()
+    setToasts((prev) => [...prev, { id, message, type }])
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id))
+    }, 3200)
+  }, [])
+
+  const notify = useCallback(
+    (message: string, type: ToastType = 'info') => {
+      setLatestTx(message)
+      showToast(message, type)
+    },
+    [showToast],
+  )
 
   const countdown = useMemo(() => getCountdown(launchAt, now), [launchAt, now])
   const miningStarted = countdown.total === 0
@@ -300,7 +325,7 @@ export default function App() {
     try {
       if (!window.ethereum) {
         setWallet(demoWallet)
-        setLatestTx('未检测到浏览器钱包，已进入演示钱包')
+        notify('未检测到浏览器钱包，已进入演示钱包', 'error')
         return
       }
 
@@ -312,9 +337,9 @@ export default function App() {
         network: network.name === 'unknown' ? `Chain ${network.chainId.toString()}` : network.name,
         demo: false,
       })
-      setLatestTx('钱包已连接')
+      notify('钱包已连接', 'success')
     } catch (error) {
-      setLatestTx(error instanceof Error ? error.message : '钱包连接失败')
+      notify(error instanceof Error ? error.message : '钱包连接失败', 'error')
     }
   }
 
@@ -323,7 +348,7 @@ export default function App() {
     const validReferrer = normalized.startsWith('0x') ? ethers.isAddress(normalized) : normalized.length >= 6
 
     if (!validReferrer) {
-      setLatestTx('推荐人地址或邀请码格式不正确')
+      notify('推荐人地址或邀请码格式不正确', 'error')
       return
     }
 
@@ -333,45 +358,46 @@ export default function App() {
 
     setBoundReferrer(normalized)
     setMachineCount((value) => Math.max(value, 1))
-    setLatestTx('推荐人已绑定，100 WNS 矿机已发放')
+    notify('推荐人已绑定，100 WNS 矿机已发放', 'success')
   }
 
   function buyMiner() {
     if (!boundReferrer) {
-      setLatestTx('请先绑定推荐人')
+      notify('请先绑定推荐人', 'error')
       return
     }
 
     setMachineCount((value) => value + 1)
-    setLatestTx(`矿机已增加，当前 ${machineCount + 1} 台`)
+    notify(`矿机已增加，当前 ${machineCount + 1} 台`, 'success')
   }
 
   function withdraw() {
     if (!withdrawReady) {
-      setLatestTx('提币需要至少两台矿机')
+      notify('提币需要至少两台矿机', 'error')
       return
     }
 
     if (validWithdrawValue <= 0 || validWithdrawValue > availableReward) {
-      setLatestTx('提币数量超出可提余额')
+      notify('提币数量超出可提余额', 'error')
       return
     }
 
     setAvailableReward((value) => Math.max(value - validWithdrawValue, 0))
     setWithdrawAmount('')
-    setLatestTx(
+    notify(
       `提币申请已创建，手续费 ${formatToken(withdrawFee)} WNS，预计到账 ${formatToken(withdrawNet)} WNS`,
+      'success',
     )
   }
 
   function copyReferralLink() {
     if (!wallet.address) {
-      setLatestTx('请先连接钱包')
+      notify('请先连接钱包')
       return
     }
 
     void navigator.clipboard.writeText(referralLink)
-    setLatestTx('推广链接已复制')
+    notify('推广链接已复制', 'success')
   }
 
   return (
@@ -385,8 +411,15 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-actions">
-          <span className="network-pill">{wallet.demo ? '演示模式' : wallet.network}</span>
-          <button className="gold-button" type="button" onClick={connectWallet}>
+          <span className={wallet.demo ? 'network-pill demo' : 'network-pill'}>
+            {wallet.demo ? '演示模式' : wallet.network}
+          </span>
+          <button
+            className="gold-button"
+            type="button"
+            onClick={connectWallet}
+            aria-label={wallet.address ? '切换钱包' : '连接钱包'}
+          >
             <Wallet size={18} />
             {shortAddress(wallet.address)}
           </button>
@@ -507,6 +540,7 @@ export default function App() {
                 onChange={(event) => setReferrerInput(event.target.value)}
                 placeholder="推荐人地址或邀请码"
                 disabled={Boolean(boundReferrer)}
+                aria-label="推荐人地址或邀请码"
               />
               <button type="button" onClick={bindReferrer} disabled={Boolean(boundReferrer)}>
                 <Check size={18} />
@@ -538,7 +572,7 @@ export default function App() {
             <PanelTitle icon={<Hammer size={22} />} kicker="MINER" title="矿机收益" />
             <div className="miner-core">
               <div className="miner-token">
-                <span>{machineCount}</span>
+                <span className="numeric">{machineCount}</span>
                 <small>MINERS</small>
               </div>
               <div className="miner-income">
@@ -588,6 +622,7 @@ export default function App() {
                 onChange={(event) => setWithdrawAmount(event.target.value)}
                 placeholder="提币数量"
                 inputMode="decimal"
+                aria-label="提币数量"
               />
             </div>
             <div className="fee-preview">
@@ -623,7 +658,7 @@ export default function App() {
               return (
                 <article className={unlocked ? 'generation active' : 'generation'} key={`generation-${rate}-${index}`}>
                   <span>{index + 1}代</span>
-                  <strong>{rate}%</strong>
+                  <strong className="numeric">{rate}%</strong>
                   <small>{unlocked ? '已解锁' : `直推 ${index + 1} 人`}</small>
                 </article>
               )
@@ -681,6 +716,14 @@ export default function App() {
           </article>
         </section>
       </main>
+
+      <div className="toast-stack" role="status" aria-live="polite" aria-atomic="true">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast ${toast.type}`}>
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
