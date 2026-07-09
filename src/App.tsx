@@ -531,44 +531,72 @@ export default function App() {
         </section>
 
         <section className="control-layout">
-          <article className="panel bind-panel">
-            <PanelTitle icon={<Link2 size={22} />} kicker="STEP 01" title="绑定推荐人" />
-            <div className="input-row">
-              <input
-                value={referrerInput}
-                onChange={(event) => setReferrerInput(event.target.value)}
-                placeholder="推荐人地址或邀请码"
-                disabled={Boolean(boundReferrer)}
-                aria-label="推荐人地址或邀请码"
-              />
-              <button type="button" onClick={bindReferrer} disabled={Boolean(boundReferrer)}>
-                <Check size={18} />
-                {boundReferrer ? '已绑定' : '绑定'}
-              </button>
-            </div>
-            <dl className="data-list">
-              <div>
-                <dt>当前推荐人</dt>
-                <dd>{boundReferrer ? shortAddress(boundReferrer) : '未绑定'}</dd>
+          <div className="left-stack">
+            <article className="panel bind-panel">
+              <PanelTitle icon={<Link2 size={20} />} kicker="开始" title="绑定推荐人" />
+              <div className="input-row">
+                <input
+                  value={referrerInput}
+                  onChange={(event) => setReferrerInput(event.target.value)}
+                  placeholder="推荐人地址或邀请码"
+                  disabled={Boolean(boundReferrer)}
+                  aria-label="推荐人地址或邀请码"
+                />
+                <button type="button" onClick={bindReferrer} disabled={Boolean(boundReferrer)}>
+                  <Check size={18} />
+                  {boundReferrer ? '已绑定' : '绑定'}
+                </button>
               </div>
-              <div>
-                <dt>赠送矿机</dt>
-                <dd>{boundReferrer ? '已发放' : '待绑定'}</dd>
-              </div>
-              <div>
-                <dt>推广链接</dt>
-                <dd>
-                  <button className="ghost-button" type="button" onClick={copyReferralLink}>
-                    <Copy size={16} />
-                    复制
-                  </button>
-                </dd>
-              </div>
-            </dl>
-          </article>
+              <dl className="data-list">
+                <div>
+                  <dt>当前推荐人</dt>
+                  <dd>{boundReferrer ? shortAddress(boundReferrer) : '未绑定'}</dd>
+                </div>
+                <div>
+                  <dt>赠送矿机</dt>
+                  <dd>{boundReferrer ? '已发放' : '待绑定'}</dd>
+                </div>
+                <div>
+                  <dt>推广链接</dt>
+                  <dd>
+                    <button className="ghost-button" type="button" onClick={copyReferralLink}>
+                      <Copy size={16} />
+                      复制
+                    </button>
+                  </dd>
+                </div>
+              </dl>
+            </article>
 
-          <article className="panel miner-panel">
-            <PanelTitle icon={<Hammer size={22} />} kicker="MINER" title="矿机收益" />
+            <article className="panel admin-panel">
+              <PanelTitle icon={<Settings size={20} />} kicker="运营" title="参数设置" />
+              <div className="setting-row">
+                <div>
+                  <span>提币手续费</span>
+                  <strong>{feeRate}%</strong>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="80"
+                  step="1"
+                  value={feeRate}
+                  onChange={(event) => setFeeRate(Number(event.target.value))}
+                />
+              </div>
+              <div className="button-pair">
+                <button type="button" onClick={() => setFeeRate(TOKENOMICS.defaultWithdrawFee)}>
+                  恢复 50%
+                </button>
+                <button type="button" onClick={() => setLaunchAt(Date.now())}>
+                  开启头矿
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <article className="panel action-panel">
+            <PanelTitle icon={<Hammer size={20} />} kicker="矿机" title="收益与提币" />
             <div className="miner-core">
               <div className="miner-token">
                 <span className="numeric">{machineCount}</span>
@@ -580,6 +608,7 @@ export default function App() {
                 <small>每台价值 100 WNS</small>
               </div>
             </div>
+
             <div className="mini-stats">
               <div>
                 <span>每日收益</span>
@@ -594,6 +623,7 @@ export default function App() {
                 <strong>{formatToken(availableReward, 4)}</strong>
               </div>
             </div>
+
             <div className="gate-line">
               <div>
                 <span>提币门槛</span>
@@ -603,14 +633,14 @@ export default function App() {
                 <span style={{ width: `${minerGateProgress}%` }} />
               </div>
             </div>
+
             <button className="wide-button" type="button" onClick={buyMiner}>
               <Pickaxe size={18} />
               增加 100 WNS 矿机
             </button>
-          </article>
 
-          <article className="panel withdraw-panel">
-            <PanelTitle icon={<ArrowDownToLine size={22} />} kicker="WITHDRAW" title="提币" />
+            <div className="withdraw-divider" />
+
             <div className={withdrawReady ? 'gate-status ready' : 'gate-status'}>
               <LockKeyhole size={18} />
               <span>{withdrawReady ? '提币条件已满足' : `至少需要 ${TOKENOMICS.withdrawMachineGate} 台矿机`}</span>
@@ -669,35 +699,9 @@ export default function App() {
           </div>
         </section>
 
-        <section className="admin-grid">
-          <article className="panel admin-panel">
-            <PanelTitle icon={<Settings size={22} />} kicker="ADMIN" title="运营参数" />
-            <div className="setting-row">
-              <div>
-                <span>提币手续费</span>
-                <strong>{feeRate}%</strong>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="80"
-                step="1"
-                value={feeRate}
-                onChange={(event) => setFeeRate(Number(event.target.value))}
-              />
-            </div>
-            <div className="button-pair">
-              <button type="button" onClick={() => setFeeRate(TOKENOMICS.defaultWithdrawFee)}>
-                恢复 50%
-              </button>
-              <button type="button" onClick={() => setLaunchAt(Date.now())}>
-                正式开启头矿
-              </button>
-            </div>
-          </article>
-
+        <section className="status-section">
           <article className="panel status-panel">
-            <PanelTitle icon={<Clock3 size={22} />} kicker="STATUS" title="链上状态" />
+            <PanelTitle icon={<Clock3 size={20} />} kicker="状态" title="链上记录" />
             <dl className="data-list compact">
               <div>
                 <dt>钱包</dt>
