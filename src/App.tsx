@@ -404,7 +404,7 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <div className="brand-medal">V</div>
+          <div className="brand-mark">V</div>
           <div>
             <span>WNS Venice</span>
             <strong>威尼斯共识矿池</strong>
@@ -415,7 +415,7 @@ export default function App() {
             {wallet.demo ? '演示模式' : wallet.network}
           </span>
           <button
-            className="gold-button"
+            className="primary-button"
             type="button"
             onClick={connectWallet}
             aria-label={wallet.address ? '切换钱包' : '连接钱包'}
@@ -479,7 +479,6 @@ export default function App() {
                   <small>VENICE</small>
                 </div>
               </div>
-              <div className="coin-base" />
             </div>
             <div className="hero-ledger">
               <div>
@@ -559,7 +558,7 @@ export default function App() {
               <div>
                 <dt>推广链接</dt>
                 <dd>
-                  <button className="text-button" type="button" onClick={copyReferralLink}>
+                  <button className="ghost-button" type="button" onClick={copyReferralLink}>
                     <Copy size={16} />
                     复制
                   </button>
