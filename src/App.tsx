@@ -43,6 +43,7 @@ type MetricProps = {
   detail: string
   progress?: number
   tone?: 'gold' | 'green' | 'red'
+  pulse?: boolean
 }
 
 type PanelTitleProps = {
@@ -153,14 +154,14 @@ function getCountdown(launchAt: number, now: number) {
   return { total, days, hours, minutes, seconds }
 }
 
-function Metric({ icon, label, value, detail, progress, tone = 'gold' }: MetricProps) {
+function Metric({ icon, label, value, detail, progress, tone = 'gold', pulse }: MetricProps) {
   return (
     <article className={`metric metric-${tone}`}>
       <div className="metric-head">
         <div className="metric-icon">{icon}</div>
         <span>{label}</span>
       </div>
-      <strong>{value}</strong>
+      <strong className={pulse ? 'pulse-value' : ''}>{value}</strong>
       <small>{detail}</small>
       {typeof progress === 'number' ? (
         <div className="metric-progress" aria-hidden="true">
@@ -402,6 +403,22 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <div className="ambient-light" aria-hidden="true" />
+      <div className="particles" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+      </div>
+
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">V</div>
@@ -428,6 +445,7 @@ export default function App() {
 
       <main>
         <section className="hero-panel">
+          <div className="hero-glow" aria-hidden="true" />
           <div className="hero-copy">
             <span className="eyebrow">VENICE · WNS PROTOCOL</span>
             <h1>威尼斯 WNS 共识矿池</h1>
@@ -473,6 +491,11 @@ export default function App() {
 
           <div className="hero-visual" aria-label="WNS Venice token">
             <div className="coin-stage">
+              <div className="coin-orbit" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
               <div className="coin-ring">
                 <div className="coin-face">
                   <span>WNS</span>
@@ -504,6 +527,7 @@ export default function App() {
             value={`${formatWhole(TOKENOMICS.totalSupply)} WNS`}
             detail="固定总量"
             progress={100}
+            pulse
           />
           <Metric
             icon={<ChartNoAxesCombined size={24} />}
